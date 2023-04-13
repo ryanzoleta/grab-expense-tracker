@@ -48,13 +48,18 @@ def get_grab_emails(creds):
             email_message = message_from_string(raw_email)
 
             for part in email_message.walk():
+                if part.get_all('Subject') is None:
+                    continue
+
                 subject = part.get_all('Subject')[0]
 
                 if subject is not None and subject == 'Your Grab E-Receipt':
                     emails.append(email)
                     break
+             
+            if len(emails) > 0:
+                break
             
-            break
     
     except HttpError as error:
         print(f'An error occured: {error}')
@@ -98,6 +103,7 @@ def main():
 
     # Find new grab emails
     emails = get_grab_emails(creds)
+    print(f'Found {len(emails)} emails')
 
     # For each new grab email, get the: restaurant, price, date, payment method; put into transactions
     for email in emails:
