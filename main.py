@@ -5,6 +5,7 @@ import json
 import os.path
 import base64
 import redis
+import requests
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -12,6 +13,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError    
 from email import message_from_string
 from bs4 import BeautifulSoup
+from datetime import datetime
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
@@ -75,6 +77,9 @@ def get_grab_emails(creds):
                 if subject is not None and subject == 'Your Grab E-Receipt':
                     emails.append(email)
                     break
+            
+            if len(emails) > 0:
+                break
         
         if len(emails) > 0:
             r.set('last_processed_email_id', emails[0]['id'])
@@ -131,6 +136,40 @@ def extract_data(text):
     return data_extract
 
 
+def add_to_ynab(transaction):
+    date_obj = datetime.strptime(transaction['date'], '%d %b %y')
+    date = date_obj.strftime('%Y-%m-%d')
+    
+    amount = '-' + transaction['amount'].replace('.', '') + '0'
+    shop = transaction['shop']
+
+    json = {
+        'transaction': {
+            'date': date,
+            'amount': amount,
+            'memo': shop,
+            'cleared': 'cleared',
+            'approved': True,
+            'account_id': '17a9221a-38ab-446a-9462-ca991410a2a6',
+            'payee_id': 'e8c1dc4a-ecf4-4d94-80e9-7161d884916a',
+            'category_id': '293f682f-8a36-4ba4-9e9e-64f3877711c7'
+        }
+    }
+
+    headers = {
+        'Content-type': 'application/json',
+        'Authorization': f'Bearer {os.environ["YNAB_TOKEN"]}'
+    }
+
+
+    r = requests.post('https://api.youneedabudget.com/v1/budgets/bfb94261-b4e3-4e9d-aa19-58b8d9d47678/transactions', headers=headers, json=json)
+
+    if r.status_code == 201:
+        print(f'Successfully added {shop} transaction on {date}')
+    else:
+        print(r.json())
+
+
 def main():
 
     print('Login to gmail... ', end='')
@@ -140,12 +179,11 @@ def main():
     if creds is None:
         print('ERROR: unable to login to gmail')
 
-    print('Retrieving grab emails...')
+    print('Retrieving grab emails... ', end='')
     emails = get_grab_emails(creds)
-    print(f'Found {len(emails)} emails')
+    print(f'found {len(emails)}')
 
-    print()
-    print('Extracting data from emails...')
+    print('Extracting transactions from emails... ', end='')
     transactions = []
     for email in emails:
         plain_text = extract_plain_text(email)
@@ -154,9 +192,11 @@ def main():
         if data is not None:
             transactions.append(data)
     
-    print(f'Found {len(transactions)} transactions')
+    print(f'found {len(transactions)}')
 
-    # TODO: Process transactions
+    print('Adding to YNAB...')
+    for transaction in transactions:
+        add_to_ynab(transaction)
 
 if __name__ == '__main__':
     main()
