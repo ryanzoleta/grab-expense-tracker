@@ -117,8 +117,9 @@ def extract_data(text):
 
 def main():
 
-    print('Login to gmail...')
+    print('Login to gmail... ', end='')
     creds = authenticate_gmail()
+    print('OK')
 
     if creds is None:
         print('ERROR: unable to login to gmail')
@@ -127,6 +128,7 @@ def main():
     emails = get_grab_emails(creds)
     print(f'Found {len(emails)} emails')
 
+    print()
     print('Extracting data from emails...')
     transactions = []
     for email in emails:
@@ -136,11 +138,9 @@ def main():
         if data is not None:
             transactions.append(data)
     
-    print()
-    print(f'Found {len(transactions)} transactions to add')
+    print(f'Found {len(transactions)} transactions')
 
     # TODO: Process transactions
 
 if __name__ == '__main__':
     main()
-    print('End')
