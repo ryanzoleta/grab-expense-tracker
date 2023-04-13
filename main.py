@@ -39,7 +39,7 @@ def get_grab_emails(creds):
 
     try:
         service = build('gmail', 'v1', credentials=creds)
-        grabmsgs = service.users().messages().list(userId='me').execute()
+        grabmsgs = service.users().messages().list(userId='me', labelIds='Label_6207772532920259483').execute()
 
         for msg in grabmsgs['messages']:
             email = service.users().messages().get(id=msg['id'], userId='me', format='raw').execute()
