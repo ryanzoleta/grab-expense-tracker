@@ -4,6 +4,7 @@ import re
 import json
 import os.path
 import base64
+import redis
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -13,6 +14,15 @@ from email import message_from_string
 from bs4 import BeautifulSoup
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+
+
+def connect_redis():
+    return redis.Redis(
+        host=os.environ['REDISHOST'],
+        username=os.environ['REDISUSER'],
+        password=os.environ['REDISPASSWORD'],
+        port=os.environ['REDISPORT']
+    )
 
 
 def authenticate_gmail():
@@ -37,11 +47,18 @@ def authenticate_gmail():
 def get_grab_emails(creds):
     emails = []
 
+    r = connect_redis()
+    last_processed_email_id = r.get('last_processed_email_id').decode('utf-8')
+
     try:
         service = build('gmail', 'v1', credentials=creds)
         grabmsgs = service.users().messages().list(userId='me', labelIds='Label_6207772532920259483').execute()
 
         for msg in grabmsgs['messages']:
+
+            if msg['id'] == last_processed_email_id:
+                break
+
             email = service.users().messages().get(id=msg['id'], userId='me', format='raw').execute()
 
             raw_message = email['raw']
@@ -58,10 +75,9 @@ def get_grab_emails(creds):
                 if subject is not None and subject == 'Your Grab E-Receipt':
                     emails.append(email)
                     break
-             
-            # if len(emails) > 0:
-            #     break
-            
+        
+        if len(emails) > 0:
+            r.set('last_processed_email_id', emails[0]['id'])
     
     except HttpError as error:
         print(f'An error occured: {error}')
