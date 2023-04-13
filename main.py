@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+import re
+import json
 import os.path
 import base64
 from google.auth.transport.requests import Request
@@ -57,8 +59,8 @@ def get_grab_emails(creds):
                     emails.append(email)
                     break
              
-            if len(emails) > 0:
-                break
+            # if len(emails) > 0:
+            #     break
             
     
     except HttpError as error:
@@ -67,7 +69,7 @@ def get_grab_emails(creds):
     return emails
 
 
-def extract_soup(email):
+def extract_plain_text(email):
     raw_message = email['raw']
     decoded_message = base64.urlsafe_b64decode(raw_message.encode('UTF-8'))
     raw_email = decoded_message.decode('UTF-8')
@@ -86,29 +88,59 @@ def extract_soup(email):
                 soup = BeautifulSoup(html_text, 'html.parser')
                 plain_text = soup.get_text()
     
-    return soup
+    all_text = ''
+
+    for s in soup:
+        all_text += s.text
+    
+    all_text = all_text.replace('\n', ' ')
+    all_text = re.sub(' +', ' ', all_text)
+
+    return all_text
 
 
-def extract_data_from_email(soup):
-    print(soup.find_all('p'))
+def extract_data(text):
+
+    pattern_file = open('data_patterns.json')
+    patterns = json.load(pattern_file)
+
+    data_extract = {}
+
+    for pattern in patterns['pattern_list']:
+        matches = re.search(pattern['pattern'], text)
+        if not matches:
+            return None
+        data_extract[pattern['data']] = matches.groups()[0].strip()
+    
+    return data_extract
 
 
 def main():
 
-    # Authenticate gmail
+    print('Login to gmail...')
     creds = authenticate_gmail()
 
     if creds is None:
         print('ERROR: unable to login to gmail')
 
-    # Find new grab emails
+    print('Retrieving grab emails...')
     emails = get_grab_emails(creds)
     print(f'Found {len(emails)} emails')
 
-    # For each new grab email, get the: restaurant, price, date, payment method; put into transactions
+    print('Extracting data from emails...')
+    transactions = []
     for email in emails:
-        soup = extract_soup(email)
-        extract_data_from_email(soup)
+        plain_text = extract_plain_text(email)
+        data = extract_data(plain_text)
+
+        if data is not None:
+            transactions.append(data)
+    
+    print()
+    print(f'Found {len(transactions)} transactions to add')
+
+    # TODO: Process transactions
 
 if __name__ == '__main__':
     main()
+    print('End')
