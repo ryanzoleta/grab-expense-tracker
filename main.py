@@ -23,12 +23,10 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 load_dotenv()
 
 logger.remove()
-logger.add(sys.stdout, format='{time:YYYY-MM-DD.HH:mm:ss} [{level}] {message}')
+logger.add('logs/logs_{time:YYYYMMDD}.log', rotation='1 week', format='{time:YYYY-MM-DD.HH:mm:ss} [{level}] {message}')
 
 
 def connect_redis():
-    logger.info('Connecting to redis...')
-
     if os.getenv('REDISHOST') is None:
         logger.error('Connection environment variables are undefined!')
         exit()
@@ -40,18 +38,13 @@ def connect_redis():
         port=os.getenv('REDISPORT')
     )
 
-    logger.info('Connection success')
-
     return r
 
 
 def authenticate_gmail():
-    logger.info('Logging in to gmail...')
-
     creds = None
 
     if os.path.exists('token.json'):
-        logger.info('Loading token.json...')
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     
     if not creds or not creds.valid:
@@ -65,14 +58,11 @@ def authenticate_gmail():
 
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
-            logger.info('Login success')
     
     return creds
 
 
 def get_grab_emails(creds):
-    logger.info('Retrieving grab receipt emails...')
-
     emails = []
 
     r = connect_redis()
@@ -199,7 +189,6 @@ def add_to_ynab(transaction):
 
 
 def extract_transactions(emails):
-    logger.info('Extracting transactions from emails...')
     transactions = []
     for email in emails:
         plain_text = extract_plain_text(email)
@@ -214,8 +203,6 @@ def extract_transactions(emails):
 
 
 def main():
-    logger.info('Starting script')
-
     # Login to gmail
     creds = authenticate_gmail()
 
