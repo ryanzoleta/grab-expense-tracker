@@ -6,6 +6,7 @@ import os.path
 import base64
 import redis
 import requests
+import sys
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -14,39 +15,64 @@ from googleapiclient.errors import HttpError
 from email import message_from_string
 from bs4 import BeautifulSoup
 from datetime import datetime
+from loguru import logger
+from dotenv import load_dotenv
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
+load_dotenv()
+
+logger.remove()
+logger.add(sys.stdout, format='{time:YYYY-MM-DD.HH:mm:ss} [{level}] {message}')
+
 
 def connect_redis():
-    return redis.Redis(
-        host=os.environ['REDISHOST'],
-        username=os.environ['REDISUSER'],
-        password=os.environ['REDISPASSWORD'],
-        port=os.environ['REDISPORT']
+    logger.info('Connecting to redis...')
+
+    if os.getenv('REDISHOST') is None:
+        logger.error('Connection environment variables are undefined!')
+        exit()
+
+    r = redis.Redis(
+        host=os.getenv('REDISHOST'),
+        username=os.getenv('REDISUSER'),
+        password=os.getenv('REDISPASSWORD'),
+        port=os.getenv('REDISPORT')
     )
+
+    logger.info('Connection success')
+
+    return r
 
 
 def authenticate_gmail():
+    logger.info('Logging in to gmail...')
+
     creds = None
 
     if os.path.exists('token.json'):
+        logger.info('Loading token.json...')
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
+            logger.info('Credentials expired, requesting a refresh...')
             creds.refresh(Request())
         else:
+            logger.info('No existing credentials, creating new...')
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
 
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
+            logger.info('Login success')
     
     return creds
 
 
 def get_grab_emails(creds):
+    logger.info('Retrieving grab receipt emails...')
+
     emails = []
 
     r = connect_redis()
@@ -86,6 +112,8 @@ def get_grab_emails(creds):
     
     except HttpError as error:
         print(f'An error occured: {error}')
+    
+    logger.info(f'Retrieved {len(emails)} emails!')
     
     return emails
 
@@ -170,20 +198,8 @@ def add_to_ynab(transaction):
         print(r.json())
 
 
-def main():
-
-    print('Login to gmail... ', end='')
-    creds = authenticate_gmail()
-    print('OK')
-
-    if creds is None:
-        print('ERROR: unable to login to gmail')
-
-    print('Retrieving grab emails... ', end='')
-    emails = get_grab_emails(creds)
-    print(f'found {len(emails)}')
-
-    print('Extracting transactions from emails... ', end='')
+def extract_transactions(emails):
+    logger.info('Extracting transactions from emails...')
     transactions = []
     for email in emails:
         plain_text = extract_plain_text(email)
@@ -191,10 +207,32 @@ def main():
 
         if data is not None:
             transactions.append(data)
-    
-    print(f'found {len(transactions)}')
 
-    print('Adding to YNAB...')
+    logger.info(f'Found {len(transactions)} transactions!')
+    
+    return transactions
+
+
+def main():
+    logger.info('Starting script')
+
+    # Login to gmail
+    creds = authenticate_gmail()
+
+    if creds is None:
+        logger.error('Error logging in!')
+        exit()
+
+    # Retreive relevant emails
+    emails = get_grab_emails(creds)
+
+    if len(emails) == 0:
+        exit()
+
+    # Extract transactions
+    transactions = extract_transactions(emails)
+    
+    # Add transactions to ynab
     for transaction in transactions:
         add_to_ynab(transaction)
 
