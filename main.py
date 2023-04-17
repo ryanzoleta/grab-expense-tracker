@@ -50,7 +50,10 @@ def authenticate_gmail():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             logger.info('Credentials expired, requesting a refresh...')
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except Exception as e:
+                logger.error(str(e))
         else:
             logger.info('No existing credentials, creating new...')
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
