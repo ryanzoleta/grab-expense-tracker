@@ -54,6 +54,10 @@ def authenticate_gmail():
                 creds.refresh(Request())
             except Exception as e:
                 logger.error(str(e))
+
+                logger.info('Deleting old token.json...')
+                os.remove('token.json')
+                exit()
         else:
             logger.info('No existing credentials, creating new...')
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
