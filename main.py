@@ -104,6 +104,8 @@ def get_grab_emails(creds):
             if len(emails) > 0:
                 break
         
+        print('Hello')
+        
         if len(emails) > 0:
             r.set('last_processed_email_id', emails[0]['id'])
     
