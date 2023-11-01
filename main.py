@@ -30,6 +30,15 @@ logger.add(
     format="{time:YYYY-MM-DD.HH:mm:ss} [{level}] {message}",
 )
 
+parser = argparse.ArgumentParser(description="Grab Expense Tracker")
+parser.add_argument("--processlast", action="store_true", help="Process the last item")
+args = parser.parse_args()
+
+
+ynab_ids_file = open("ynab_ids.json")
+ynab_ids = json.load(ynab_ids_file)
+account_ids = ynab_ids["accounts"]
+
 
 def connect_redis():
     if os.getenv("REDISHOST") is None:
@@ -90,7 +99,7 @@ def get_grab_emails(creds):
         )
 
         for msg in grabmsgs["messages"]:
-            if msg["id"] == last_processed_email_id:
+            if not args.processlast and msg["id"] == last_processed_email_id:
                 break
 
             email = (
@@ -115,10 +124,13 @@ def get_grab_emails(creds):
                     emails.append(email)
                     break
 
+            if args.processlast:
+                break
+
             if len(emails) > 0:
                 break
 
-        if len(emails) > 0:
+        if len(emails) > 0 and not args.processlast:
             r.set("last_processed_email_id", emails[0]["id"])
 
     except HttpError as error:
@@ -180,6 +192,9 @@ def add_to_ynab(transaction):
 
     amount = "-" + transaction["amount"].replace(".", "") + "0"
     shop = transaction["shop"]
+    account = [x for x in account_ids if x["name"] == transaction["pay_method"]][0][
+        "id"
+    ]
 
     json = {
         "transaction": {
@@ -188,7 +203,7 @@ def add_to_ynab(transaction):
             "memo": shop,
             "cleared": "cleared",
             "approved": True,
-            "account_id": "17a9221a-38ab-446a-9462-ca991410a2a6",
+            "account_id": account,
             "payee_id": "e8c1dc4a-ecf4-4d94-80e9-7161d884916a",
             "category_id": "293f682f-8a36-4ba4-9e9e-64f3877711c7",
         }

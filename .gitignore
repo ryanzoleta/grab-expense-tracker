@@ -162,3 +162,5 @@ cython_debug/
 # Custom
 credentials.json
 token.json
+
+.DS_Store

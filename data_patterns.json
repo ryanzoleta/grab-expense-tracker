@@ -6,7 +6,7 @@
     },
     {
       "data": "pay_method",
-      "pattern": "Payment Method: (GrabPay) Wallet"
+      "pattern": "Payment Method: ((?:GrabPay|Visa))"
     },
     {
       "data": "shop",
