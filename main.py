@@ -127,8 +127,8 @@ def get_grab_emails(creds):
             if args.processlast:
                 break
 
-            if len(emails) > 0:
-                break
+            # if len(emails) > 0:
+            #     break
 
         if len(emails) > 0 and not args.processlast:
             r.set("last_processed_email_id", emails[0]["id"])
