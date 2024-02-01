@@ -40,19 +40,19 @@ ynab_ids = json.load(ynab_ids_file)
 account_ids = ynab_ids["accounts"]
 
 
-def connect_redis():
-    if os.getenv("REDISHOST") is None:
-        logger.error("Connection environment variables are undefined!")
-        exit()
+# def connect_redis():
+#     if os.getenv("REDISHOST") is None:
+#         logger.error("Connection environment variables are undefined!")
+#         exit()
 
-    r = redis.Redis(
-        host=os.getenv("REDISHOST"),
-        username=os.getenv("REDISUSER"),
-        password=os.getenv("REDISPASSWORD"),
-        port=os.getenv("REDISPORT"),
-    )
+#     r = redis.Redis(
+#         host=os.getenv("REDISHOST"),
+#         username=os.getenv("REDISUSER"),
+#         password=os.getenv("REDISPASSWORD"),
+#         port=os.getenv("REDISPORT"),
+#     )
 
-    return r
+#     return r
 
 
 def authenticate_gmail():
@@ -86,8 +86,9 @@ def authenticate_gmail():
 def get_grab_emails(creds):
     emails = []
 
-    r = connect_redis()
-    last_processed_email_id = r.get("last_processed_email_id").decode("utf-8")
+    data_file = open("data.json")
+    data = json.load(data_file)
+    last_processed_email_id = data["last_processed_email_id"]
 
     try:
         service = build("gmail", "v1", credentials=creds)
@@ -98,7 +99,7 @@ def get_grab_emails(creds):
             .execute()
         )
 
-        for msg in grabmsgs["messages"]:
+        for msg in grabmsgs["messages"]:            
             if not args.processlast and msg["id"] == last_processed_email_id:
                 break
 
@@ -131,7 +132,9 @@ def get_grab_emails(creds):
             #     break
 
         if len(emails) > 0 and not args.processlast:
-            r.set("last_processed_email_id", emails[0]["id"])
+            data["last_processed_email_id"] = emails[0]["id"]
+            with open("data.json", "w") as outfile:
+                json.dump(data, outfile)
 
     except HttpError as error:
         print(f"An error occured: {error}")

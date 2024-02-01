@@ -164,3 +164,6 @@ credentials.json
 token.json
 
 .DS_Store
+
+# holds mutable data
+data.json
