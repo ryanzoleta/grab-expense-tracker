@@ -64,6 +64,7 @@ def authenticate_gmail():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             logger.info("Credentials expired, requesting a refresh...")
+            print('Credentials expired, requesting a refresh...')
             try:
                 creds.refresh(Request())
             except Exception as e:
