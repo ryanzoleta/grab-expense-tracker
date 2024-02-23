@@ -63,18 +63,17 @@ def authenticate_gmail():
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            logger.info("Credentials expired, requesting a refresh...")
-            print('Credentials expired, requesting a refresh...')
+            print("Credentials expired, requesting a refresh...")
             try:
                 creds.refresh(Request())
             except Exception as e:
                 logger.error(str(e))
 
-                logger.info("Deleting old token.json...")
+                print("Deleting old token.json...")
                 os.remove("token.json")
                 exit()
         else:
-            logger.info("No existing credentials, creating new...")
+            print("No existing credentials, creating new...")
             flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
             creds = flow.run_local_server(port=0)
 
@@ -140,7 +139,7 @@ def get_grab_emails(creds):
     except HttpError as error:
         print(f"An error occured: {error}")
 
-    logger.info(f"Retrieved {len(emails)} emails!")
+    print(f"Retrieved {len(emails)} emails!")
 
     return emails
 
@@ -239,7 +238,7 @@ def extract_transactions(emails):
         if data is not None:
             transactions.append(data)
 
-    logger.info(f"Found {len(transactions)} transactions!")
+    print(f"Found {len(transactions)} transactions!")
 
     return transactions
 
