@@ -90,6 +90,8 @@ def get_grab_emails(creds):
     data = json.load(data_file)
     last_processed_email_id = data["last_processed_email_id"]
 
+    print('last_processed_email_id', last_processed_email_id)
+
     try:
         service = build("gmail", "v1", credentials=creds)
         grabmsgs = (
