@@ -1,6 +1,7 @@
 {
   "accounts": [
     { "name": "GrabPay", "id": "17a9221a-38ab-446a-9462-ca991410a2a6" },
-    { "name": "Visa", "id": "4acfd0f3-6e7b-47fb-85c1-6c0327bd5dd5" }
+    { "name": "Visa", "id": "4acfd0f3-6e7b-47fb-85c1-6c0327bd5dd5" },
+    { "name": "MasterCard", "id": "f0f1b85f-2ae5-4d84-ad85-3eb183a39aee" }
   ]
 }
