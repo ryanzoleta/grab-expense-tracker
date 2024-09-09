@@ -90,7 +90,7 @@ def get_grab_emails(creds):
     data = json.load(data_file)
     last_processed_email_id = data["last_processed_email_id"]
 
-    print('last_processed_email_id', last_processed_email_id)
+    print("last_processed_email_id", last_processed_email_id)
 
     try:
         service = build("gmail", "v1", credentials=creds)
@@ -101,7 +101,7 @@ def get_grab_emails(creds):
             .execute()
         )
 
-        for msg in grabmsgs["messages"]:            
+        for msg in grabmsgs["messages"]:
             if not args.processlast and msg["id"] == last_processed_email_id:
                 break
 
@@ -206,7 +206,7 @@ def add_to_ynab(transaction):
             "date": date,
             "amount": amount,
             "memo": shop,
-            "cleared": "cleared",
+            "cleared": "uncleared",
             "approved": True,
             "account_id": account,
             "payee_id": "e8c1dc4a-ecf4-4d94-80e9-7161d884916a",
