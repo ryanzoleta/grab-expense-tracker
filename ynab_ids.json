@@ -2,6 +2,12 @@
   "accounts": [
     { "name": "GrabPay", "id": "17a9221a-38ab-446a-9462-ca991410a2a6" },
     { "name": "Visa", "id": "4acfd0f3-6e7b-47fb-85c1-6c0327bd5dd5" },
-    { "name": "MasterCard", "id": "f0f1b85f-2ae5-4d84-ad85-3eb183a39aee" }
-  ]
+    { "name": "MasterCard", "id": "f0f1b85f-2ae5-4d84-ad85-3eb183a39aee" },
+    { "name": "Metrobank", "id": "9f751fab-d171-4052-9c25-8741d4dccd1f" }
+  ],
+  "payees": {
+    "S & R WAREHOUSE CIRCUIT M": "32d3d3b4-2639-40c2-8210-3d242e91b20f",
+    "VEDAS GASOLINE STATION": "1b2732c8-aae6-4ce8-bae8-1a98129c8911",
+    "Grab": "e8c1dc4a-ecf4-4d94-80e9-7161d884916a"
+  }
 }

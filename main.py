@@ -18,8 +18,10 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from loguru import logger
 from dotenv import load_dotenv
+from utils import authenticate_gmail
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+SUBJECTS = ["Your Grab E-Receipt", "Transaction Notification"]
+
 
 load_dotenv()
 
@@ -55,35 +57,7 @@ account_ids = ynab_ids["accounts"]
 #     return r
 
 
-def authenticate_gmail():
-    creds = None
-
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            print("Credentials expired, requesting a refresh...")
-            try:
-                creds.refresh(Request())
-            except Exception as e:
-                logger.error(str(e))
-
-                print("Deleting old token.json...")
-                os.remove("token.json")
-                exit()
-        else:
-            print("No existing credentials, creating new...")
-            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-            creds = flow.run_local_server(port=0)
-
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
-
-    return creds
-
-
-def get_grab_emails(creds):
+def get_emails(creds):
     emails = []
 
     data_file = open("data.json")
@@ -91,17 +65,12 @@ def get_grab_emails(creds):
     last_processed_email_id = data["last_processed_email_id"]
 
     print("last_processed_email_id", last_processed_email_id)
+    service = build("gmail", "v1", credentials=creds)
 
     try:
-        service = build("gmail", "v1", credentials=creds)
-        grabmsgs = (
-            service.users()
-            .messages()
-            .list(userId="me", labelIds="Label_6207772532920259483")
-            .execute()
-        )
+        msgs = service.users().messages().list(userId="me").execute()
 
-        for msg in grabmsgs["messages"]:
+        for msg in msgs["messages"]:
             if not args.processlast and msg["id"] == last_processed_email_id:
                 break
 
@@ -123,15 +92,13 @@ def get_grab_emails(creds):
 
                 subject = part.get_all("Subject")[0]
 
-                if subject is not None and subject == "Your Grab E-Receipt":
+                if subject is not None and subject_matches(subject, SUBJECTS):
                     emails.append(email)
+                    print(f"Will process: {subject}")
                     break
 
             if args.processlast:
                 break
-
-            # if len(emails) > 0:
-            #     break
 
         if len(emails) > 0 and not args.processlast:
             data["last_processed_email_id"] = emails[0]["id"]
@@ -165,24 +132,34 @@ def extract_plain_text(email):
                 soup = BeautifulSoup(html_text, "html.parser")
                 plain_text = soup.get_text()
 
-    all_text = ""
+        for s in soup:
+            plain_text += s.text
 
-    for s in soup:
-        all_text += s.text
+    plain_text = plain_text.replace("\n", " ")
+    plain_text = re.sub(" +", " ", plain_text)
 
-    all_text = all_text.replace("\n", " ")
-    all_text = re.sub(" +", " ", all_text)
+    return {
+        "text": plain_text,
+        "subject": email["Subject"],
+    }
 
-    return all_text
 
-
-def extract_data(text):
+def extract_data(text, subject):
     pattern_file = open("data_patterns.json")
-    patterns = json.load(pattern_file)
+    email_types = json.load(pattern_file)
+
+    for email_type in email_types["email_types"]:
+        if subject in email_type["subject"]:
+            patterns = email_type
+            break
 
     data_extract = {}
 
     for pattern in patterns["pattern_list"]:
+        if "default" in pattern.keys():
+            data_extract[pattern["data"]] = pattern["default"]
+            continue
+
         matches = re.search(pattern["pattern"], text)
         if not matches:
             return None
@@ -192,14 +169,28 @@ def extract_data(text):
 
 
 def add_to_ynab(transaction):
-    date_obj = datetime.strptime(transaction["date"], "%d %b %y")
+    if "date" in transaction.keys():
+        date_obj = datetime.strptime(transaction["date"], "%d %b %y")
+    else:
+        date_obj = datetime.now()
     date = date_obj.strftime("%Y-%m-%d")
 
     amount = "-" + transaction["amount"].replace(".", "") + "0"
-    shop = transaction["shop"]
+
+    if "shop" in transaction.keys():
+        shop = transaction["shop"]
+    else:
+        shop = ""
+
     account = [x for x in account_ids if x["name"] == transaction["pay_method"]][0][
         "id"
     ]
+
+    try:
+        payee = ynab_ids["payees"][transaction["payee"]]
+    except KeyError:
+        logger.error(f"Payee {transaction['payee']} not found!")
+        return
 
     json = {
         "transaction": {
@@ -209,8 +200,8 @@ def add_to_ynab(transaction):
             "cleared": "uncleared",
             "approved": True,
             "account_id": account,
-            "payee_id": "e8c1dc4a-ecf4-4d94-80e9-7161d884916a",
-            "category_id": "293f682f-8a36-4ba4-9e9e-64f3877711c7",
+            "payee_id": payee,
+            # "category_id": "293f682f-8a36-4ba4-9e9e-64f3877711c7",
         }
     }
 
@@ -218,6 +209,8 @@ def add_to_ynab(transaction):
         "Content-type": "application/json",
         "Authorization": f'Bearer {os.environ["YNAB_TOKEN"]}',
     }
+
+    print("Adding to YNAB:", json)
 
     r = requests.post(
         "https://api.youneedabudget.com/v1/budgets/bfb94261-b4e3-4e9d-aa19-58b8d9d47678/transactions",
@@ -234,8 +227,10 @@ def add_to_ynab(transaction):
 def extract_transactions(emails):
     transactions = []
     for email in emails:
-        plain_text = extract_plain_text(email)
-        data = extract_data(plain_text)
+        email_data = extract_plain_text(email)
+        plain_text = email_data["text"]
+        subject = email_data["subject"]
+        data = extract_data(plain_text, subject)
 
         if data is not None:
             transactions.append(data)
@@ -243,6 +238,14 @@ def extract_transactions(emails):
     print(f"Found {len(transactions)} transactions!")
 
     return transactions
+
+
+def subject_matches(subject, subjects_list):
+    for s in subjects_list:
+        if s in subject:
+            return True
+
+    return False
 
 
 def main():
@@ -254,7 +257,7 @@ def main():
         exit()
 
     # Retreive relevant emails
-    emails = get_grab_emails(creds)
+    emails = get_emails(creds)
 
     if len(emails) == 0:
         exit()
