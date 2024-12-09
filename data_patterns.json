@@ -13,7 +13,7 @@
         },
         {
           "data": "shop",
-          "pattern": "Pick up location: (.*)Drop off"
+          "pattern": "Pick up location: (.*) - "
         },
         {
           "data": "date",

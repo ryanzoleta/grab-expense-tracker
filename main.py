@@ -31,6 +31,7 @@ logger.add(
     rotation="1 week",
     format="{time:YYYY-MM-DD.HH:mm:ss} [{level}] {message}",
 )
+logger.add(sys.stdout, format="{time:YYYY-MM-DD.HH:mm:ss} [{level}] {message}")
 
 parser = argparse.ArgumentParser(description="Grab Expense Tracker")
 parser.add_argument("--processlast", action="store_true", help="Process the last item")
@@ -64,7 +65,7 @@ def get_emails(creds):
     data = json.load(data_file)
     last_processed_email_id = data["last_processed_email_id"]
 
-    print("last_processed_email_id", last_processed_email_id)
+    logger.info(f"last_processed_email_id {last_processed_email_id}")
     service = build("gmail", "v1", credentials=creds)
 
     try:
@@ -94,7 +95,6 @@ def get_emails(creds):
 
                 if subject is not None and subject_matches(subject, SUBJECTS):
                     emails.append(email)
-                    print(f"Will process: {subject}")
                     break
 
             if args.processlast:
@@ -106,9 +106,9 @@ def get_emails(creds):
                 json.dump(data, outfile)
 
     except HttpError as error:
-        print(f"An error occured: {error}")
+        logger.info(f"An error occured: {error}")
 
-    print(f"Retrieved {len(emails)} emails!")
+    logger.info(f"Retrieved {len(emails)} emails")
 
     return emails
 
@@ -125,15 +125,16 @@ def extract_plain_text(email):
             plain_text = part.get_payload(decode=True).decode("UTF-8")
             break
 
-    if not plain_text:
+    if plain_text.strip() == "":
         for part in email.walk():
             if part.get_content_type() == "text/html":
                 html_text = part.get_payload(decode=True).decode("UTF-8")
                 soup = BeautifulSoup(html_text, "html.parser")
                 plain_text = soup.get_text()
 
-        for s in soup:
-            plain_text += s.text
+        # for s in soup:
+        #     plain_text += s.text.replace("\n", "")
+        #     logger.info(f"Adding to plain_text {s.text}")
 
     plain_text = plain_text.replace("\n", " ")
     plain_text = re.sub(" +", " ", plain_text)
@@ -210,7 +211,7 @@ def add_to_ynab(transaction):
         "Authorization": f'Bearer {os.environ["YNAB_TOKEN"]}',
     }
 
-    print("Adding to YNAB:", json)
+    logger.info(f"Adding to YNAB: {json}")
 
     r = requests.post(
         "https://api.youneedabudget.com/v1/budgets/bfb94261-b4e3-4e9d-aa19-58b8d9d47678/transactions",
@@ -219,9 +220,9 @@ def add_to_ynab(transaction):
     )
 
     if r.status_code == 201:
-        print(f"Successfully added {shop} transaction on {date}")
+        logger.info(f"Successfully added transaction to YNAB ")
     else:
-        print(r.json())
+        logger.error(r.json())
 
 
 def extract_transactions(emails):
@@ -233,9 +234,12 @@ def extract_transactions(emails):
         data = extract_data(plain_text, subject)
 
         if data is not None:
+            logger.info(f"Processing {email_data['subject']} {email['id']}")
             transactions.append(data)
+        else:
+            logger.error(f"Skipping {email_data['subject']} {email['id']}")
 
-    print(f"Found {len(transactions)} transactions!")
+    logger.info(f"Found {len(transactions)} transactions!")
 
     return transactions
 
@@ -257,6 +261,7 @@ def main():
         exit()
 
     # Retreive relevant emails
+    logger.info("Retrieving emails...")
     emails = get_emails(creds)
 
     if len(emails) == 0:
