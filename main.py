@@ -221,8 +221,9 @@ def add_to_ynab(transaction):
 
     if r.status_code == 201:
         logger.info(f"Successfully added transaction to YNAB ")
+        logger.info(f"Response: {r.json()}")
     else:
-        logger.error(r.json())
+        logger.error(f"Failed to add transaction to YNAB: {r.json()}")
 
 
 def extract_transactions(emails):

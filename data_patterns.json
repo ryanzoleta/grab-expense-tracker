@@ -38,11 +38,11 @@
         },
         {
           "data": "pay_method",
-          "default": "Metrobank"
+          "default": "Metrobank Visa Signature"
         },
         {
           "data": "payee",
-          "pattern": "ending in 7334 at (.*) for PHP"
+          "pattern": "ending in 6999 at (.*) for PHP"
         }
       ]
     },
